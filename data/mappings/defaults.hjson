@@ -89,6 +89,11 @@
             "board": "QMK_PM2040",
             "bootloader": "rp2040",
             "processor": "RP2040"
+        },
+        "imera": {
+            "processor": "RP2040",
+            "bootloader": "rp2040",
+            "board": "QMK_PM2040"
         }
     }
 }
