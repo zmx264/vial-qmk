@@ -1,4 +1,4 @@
-/* Copyright 2023 splitkb.com <support@splitkb.com>
+/* Copyright 2022 HorrorTroll <https://github.com/HorrorTroll>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,6 +16,4 @@
 
 #pragma once
 
-#define OLED_DISPLAY_128X32
-#define SPLIT_OLED_ENABLE
-#define SPLIT_WPM_ENABLE
+void render_bongocat(void);

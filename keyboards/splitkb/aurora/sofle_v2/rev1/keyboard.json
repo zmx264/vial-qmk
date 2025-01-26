@@ -12,7 +12,11 @@
         "extrakey": true,
         "mousekey": true,
         "oled": true,
-        "rgb_matrix": true
+        "rgb_matrix": false,
+        "wpm": true
+    },
+    "build": {
+        "lto": true
     },
     "matrix_pins": {
         "cols": ["D4", "C6", "D7", "E6", "B4", "B5"],
