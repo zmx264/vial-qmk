@@ -392,133 +392,118 @@ void pointing_device_set_cpi_on_side(bool left, uint16_t cpi) {
 }
 
 /**
- * @brief clamps int16_t to int8_t
+ * @brief clamps int16_t to int8_t, or int32_t to int16_t
  *
- * @param[in] int16_t value
- * @return int8_t clamped value
+ * @param[in] hv_clamp_range_t value
+ * @return mouse_hv_report_t clamped value
  */
-static inline int8_t pointing_device_hv_clamp(int16_t value) {
-    if (value < INT8_MIN) {
-        return INT8_MIN;
-    } else if (value > INT8_MAX) {
-        return INT8_MAX;
+static inline mouse_hv_report_t pointing_device_hv_clamp(hv_clamp_range_t value) {
+    if (value < HV_REPORT_MIN) {
+        return HV_REPORT_MIN;
+    } else if (value > HV_REPORT_MAX) {
+        return HV_REPORT_MAX;
     } else {
         return value;
     }
 }
 
 /**
- * @brief clamps int16_t to int8_t
+ * @brief clamps int16_t to int8_t, or int32_t to int16_t
  *
- * @param[in] clamp_range_t value
+ * @param[in] xy_clamp_range_t value
  * @return mouse_xy_report_t clamped value
  */
-static inline mouse_xy_report_t pointing_device_xy_clamp(clamp_range_t value) {
+static inline mouse_xy_report_t pointing_device_xy_clamp(xy_clamp_range_t value) {
     if (value < XY_REPORT_MIN) {
         return XY_REPORT_MIN;
     } else if (value > XY_REPORT_MAX) {
-        return XY_REPORT_MAX;
-    } else {
-        return value;
-    }
-}
-/**
- * @brief combines 2 mouse reports and returns 2
- *
- * Combines 2 report_mouse_t structs, clamping movement values to int8_t and ignores report_id then returns the resulting report_mouse_t struct.
- *
- * NOTE: Only available when using SPLIT_POINTING_ENABLE and POINTING_DEVICE_COMBINED
- *
- * @param[in] left_report left report_mouse_t
- * @param[in] right_report right report_mouse_t
- * @return combined report_mouse_t of left_report and right_report
- */
-report_mouse_t pointing_device_combine_reports(report_mouse_t left_report, report_mouse_t right_report) {
-    left_report.x = pointing_device_xy_clamp((clamp_range_t)left_report.x + right_report.x);
-    left_report.y = pointing_device_xy_clamp((clamp_range_t)left_report.y + right_report.y);
-    left_report.h = pointing_device_hv_clamp((int16_t)left_report.h + right_report.h);
-    left_report.v = pointing_device_hv_clamp((int16_t)left_report.v + right_report.v);
-    left_report.buttons |= right_report.buttons;
-    return left_report;
-}
+        @ @-419, 10 + 432, 10 @ @ static inline mouse_xy_report_t pointing_device_xy_clamp(clamp_range_t value) {
+            *@ return combined report_mouse_t of left_report and right_report * / report_mouse_t pointing_device_combine_reports(report_mouse_t left_report, report_mouse_t right_report) {
+                left_report.x = pointing_device_xy_clamp((xy_clamp_range_t)left_report.x + right_report.x);
+                left_report.y = pointing_device_xy_clamp((xy_clamp_range_t)left_report.y + right_report.y);
+                left_report.h = pointing_device_hv_clamp((hv_clamp_range_t)left_report.h + right_report.h);
+                left_report.v = pointing_device_hv_clamp((hv_clamp_range_t)left_report.v + right_report.v);
+                left_report.buttons |= right_report.buttons;
+                return left_report;
+            }
 
-/**
- * @brief Adjust mouse report by any optional right pointing configuration defines
- *
- * This applies rotation or inversion to the mouse report as selected by the pointing device common configuration defines.
- *
- * NOTE: Only available when using SPLIT_POINTING_ENABLE and POINTING_DEVICE_COMBINED
- *
- * @param[in] mouse_report report_mouse_t to be adjusted
- * @return report_mouse_t with adjusted values
- */
-report_mouse_t pointing_device_adjust_by_defines_right(report_mouse_t mouse_report) {
-    // Support rotation of the sensor data
+            /**
+             * @brief Adjust mouse report by any optional right pointing configuration defines
+             *
+             * This applies rotation or inversion to the mouse report as selected by the pointing device common configuration defines.
+             *
+             * NOTE: Only available when using SPLIT_POINTING_ENABLE and POINTING_DEVICE_COMBINED
+             *
+             * @param[in] mouse_report report_mouse_t to be adjusted
+             * @return report_mouse_t with adjusted values
+             */
+            report_mouse_t pointing_device_adjust_by_defines_right(report_mouse_t mouse_report) {
+                // Support rotation of the sensor data
 #    if defined(POINTING_DEVICE_ROTATION_90_RIGHT) || defined(POINTING_DEVICE_ROTATION_180_RIGHT) || defined(POINTING_DEVICE_ROTATION_270_RIGHT)
-    mouse_xy_report_t x = mouse_report.x;
-    mouse_xy_report_t y = mouse_report.y;
+                mouse_xy_report_t x = mouse_report.x;
+                mouse_xy_report_t y = mouse_report.y;
 #        if defined(POINTING_DEVICE_ROTATION_90_RIGHT)
-    mouse_report.x = y;
-    mouse_report.y = -x;
+                mouse_report.x = y;
+                mouse_report.y = -x;
 #        elif defined(POINTING_DEVICE_ROTATION_180_RIGHT)
-    mouse_report.x = -x;
-    mouse_report.y = -y;
+                mouse_report.x = -x;
+                mouse_report.y = -y;
 #        elif defined(POINTING_DEVICE_ROTATION_270_RIGHT)
-    mouse_report.x = -y;
-    mouse_report.y = x;
+                mouse_report.x = -y;
+                mouse_report.y = x;
 #        else
 #            error "How the heck did you get here?!"
 #        endif
 #    endif
-    // Support Inverting the X and Y Axises
+                // Support Inverting the X and Y Axises
 #    if defined(POINTING_DEVICE_INVERT_X_RIGHT)
-    mouse_report.x = -mouse_report.x;
+                mouse_report.x = -mouse_report.x;
 #    endif
 #    if defined(POINTING_DEVICE_INVERT_Y_RIGHT)
-    mouse_report.y = -mouse_report.y;
+                mouse_report.y = -mouse_report.y;
 #    endif
-    return mouse_report;
-}
+                return mouse_report;
+            }
 
-/**
- * @brief Weak function allowing for keyboard level mouse report modification
- *
- * Takes 2 report_mouse_t structs allowing individual modification of sides at keyboard level then returns pointing_device_task_combined_user.
- *
- * NOTE: Only available when using SPLIT_POINTING_ENABLE and POINTING_DEVICE_COMBINED
- *
- * @param[in] left_report report_mouse_t
- * @param[in] right_report report_mouse_t
- * @return pointing_device_task_combined_user(left_report, right_report) by default
- */
-__attribute__((weak)) report_mouse_t pointing_device_task_combined_kb(report_mouse_t left_report, report_mouse_t right_report) {
-    return pointing_device_task_combined_user(left_report, right_report);
-}
+            /**
+             * @brief Weak function allowing for keyboard level mouse report modification
+             *
+             * Takes 2 report_mouse_t structs allowing individual modification of sides at keyboard level then returns pointing_device_task_combined_user.
+             *
+             * NOTE: Only available when using SPLIT_POINTING_ENABLE and POINTING_DEVICE_COMBINED
+             *
+             * @param[in] left_report report_mouse_t
+             * @param[in] right_report report_mouse_t
+             * @return pointing_device_task_combined_user(left_report, right_report) by default
+             */
+            __attribute__((weak)) report_mouse_t pointing_device_task_combined_kb(report_mouse_t left_report, report_mouse_t right_report) {
+                return pointing_device_task_combined_user(left_report, right_report);
+            }
 
-/**
- * @brief Weak function allowing for user level mouse report modification
- *
- * Takes 2 report_mouse_t structs allowing individual modification of sides at user level then returns pointing_device_combine_reports.
- *
- * NOTE: Only available when using SPLIT_POINTING_ENABLE and POINTING_DEVICE_COMBINED
- *
- * @param[in] left_report report_mouse_t
- * @param[in] right_report report_mouse_t
- * @return pointing_device_combine_reports(left_report, right_report) by default
- */
-__attribute__((weak)) report_mouse_t pointing_device_task_combined_user(report_mouse_t left_report, report_mouse_t right_report) {
-    return pointing_device_combine_reports(left_report, right_report);
-}
+            /**
+             * @brief Weak function allowing for user level mouse report modification
+             *
+             * Takes 2 report_mouse_t structs allowing individual modification of sides at user level then returns pointing_device_combine_reports.
+             *
+             * NOTE: Only available when using SPLIT_POINTING_ENABLE and POINTING_DEVICE_COMBINED
+             *
+             * @param[in] left_report report_mouse_t
+             * @param[in] right_report report_mouse_t
+             * @return pointing_device_combine_reports(left_report, right_report) by default
+             */
+            __attribute__((weak)) report_mouse_t pointing_device_task_combined_user(report_mouse_t left_report, report_mouse_t right_report) {
+                return pointing_device_combine_reports(left_report, right_report);
+            }
 #endif
 
-__attribute__((weak)) void pointing_device_keycode_handler(uint16_t keycode, bool pressed) {
-    if IS_MOUSEKEY_BUTTON (keycode) {
-        local_mouse_report.buttons = pointing_device_handle_buttons(local_mouse_report.buttons, pressed, keycode - QK_MOUSE_BUTTON_1);
-        pointing_device_send();
-    }
-}
+            __attribute__((weak)) void pointing_device_keycode_handler(uint16_t keycode, bool pressed) {
+                if IS_MOUSEKEY_BUTTON (keycode) {
+                    local_mouse_report.buttons = pointing_device_handle_buttons(local_mouse_report.buttons, pressed, keycode - QK_MOUSE_BUTTON_1);
+                    pointing_device_send();
+                }
+            }
 
 #ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
-uint16_t pointing_device_get_hires_scroll_resolution(void) {
-    return hires_scroll_resolution;
-}
+            uint16_t pointing_device_get_hires_scroll_resolution(void) {
+                return hires_scroll_resolution;
+            }

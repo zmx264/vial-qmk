@@ -86,8 +86,11 @@ _Static_assert(TOTAL_INTERFACES <= MAX_INTERFACES, "There are not enough availab
 #endif
 
 static uint8_t keyboard_led_state = 0;
-uint8_t        keyboard_idle      = 0;
-uint8_t        keyboard_protocol  = 1;
+#ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
+static uint8_t hires_scroll_state = 0;
+#endif
+uint8_t keyboard_idle     = 0;
+uint8_t keyboard_protocol = 1;
 
 static report_keyboard_t keyboard_report_sent;
 
@@ -258,6 +261,12 @@ static void send_mouse(report_mouse_t *report) {
 #endif
 }
 
+#ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
+bool is_hires_scroll_on(void) {
+    return hires_scroll_state > 0;
+}
+#endif
+
 static void send_extra(report_extra_t *report) {
 #ifdef EXTRAKEY_ENABLE
     send_report(SHARED_IN_EPNUM, report, sizeof(report_extra_t));
@@ -287,6 +296,9 @@ void send_programmable_button(report_programmable_button_t *report) {
  *------------------------------------------------------------------*/
 static struct {
     uint16_t len;
+#ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
+    enum { NONE, SET_LED, SET_HIRES_SCROLL } kind;
+#else
     enum { NONE, SET_LED } kind;
 } last_req;
 
@@ -312,12 +324,46 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 return 1;
             case USBRQ_HID_SET_REPORT:
                 dprint("SET_REPORT:");
-                // Report Type: 0x02(Out)/ReportID: 0x00(none) && Interface: 0(keyboard)
+#    ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
+                // note: when using vusb, the mouse always uses the shared endpoint, so we don't check for MOUSE_INTERFACE
+                switch (rq->wIndex.word) {
+#        ifndef KEYBOARD_SHARED_EP
+                    case KEYBOARD_INTERFACE:
+                        // Report Type: 0x02(Out) / ReportID: none
+                        if (rq->wValue.word == 0x0200) {
+                            dprint("SET_LED:");
+                            last_req.kind = SET_LED;
+                            last_req.len  = rq->wLength.word;
+                        }
+                        break;
+#        endif
+#        ifdef SHARED_EP_ENABLE
+                    case SHARED_INTERFACE:
+                        switch (rq->wValue.word) {
+                            // 0x02XX indicates output from computer
+                            case 0x0200 + REPORT_ID_KEYBOARD:
+                            case 0x0200 + REPORT_ID_NKRO:
+                                dprint("SET_LED:");
+                                last_req.kind = SET_LED;
+                                last_req.len  = rq->wLength.word;
+                                break;
+                            case 0x0200 + REPORT_ID_MOUSE:
+                                dprint("SET_HIRES_SCROLL:");
+                                last_req.kind = SET_HIRES_SCROLL;
+                                last_req.len  = rq->wLength.word;
+                                break;
+                        }
+                        break;
+#        endif
+                }
+#    else
                 if (rq->wValue.word == 0x0200 && rq->wIndex.word == KEYBOARD_INTERFACE) {
                     dprint("SET_LED:");
                     last_req.kind = SET_LED;
                     last_req.len  = rq->wLength.word;
                 }
+#    endif
+
                 return USB_NO_MSG; // to get data in usbFunctionWrite
             case USBRQ_HID_SET_IDLE:
                 keyboard_idle = (rq->wValue.word & 0xFF00) >> 8;
@@ -352,6 +398,14 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
             last_req.len       = 0;
             return 1;
             break;
+#    ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
+        case SET_HIRES_SCROLL:
+            dprintf("SET_HIRES_SCROLL: %02X\n", data[0]);
+            hires_scroll_state = data[0];
+            last_req.len       = 0;
+            return 1;
+            break;
+#    endif
         case NONE:
         default:
             return -1;
@@ -361,7 +415,7 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 }
 
 void usbFunctionWriteOut(uchar *data, uchar len) {
-#ifdef RAW_ENABLE
+#    ifdef RAW_ENABLE
     // Data from host must be divided every 8bytes
     if (len != 8) {
         dprint("RAW: invalid length\n");
@@ -378,25 +432,25 @@ void usbFunctionWriteOut(uchar *data, uchar len) {
         }
         raw_output_received_bytes += len;
     }
-#endif
+#    endif
 }
 
 /*------------------------------------------------------------------*
  * Descriptors                                                      *
  *------------------------------------------------------------------*/
 
-#ifdef KEYBOARD_SHARED_EP
+#    ifdef KEYBOARD_SHARED_EP
 const PROGMEM uchar shared_hid_report[] = {
-#    define SHARED_REPORT_STARTED
-#else
+#        define SHARED_REPORT_STARTED
+#    else
 const PROGMEM uchar keyboard_hid_report[] = {
-#endif
+#    endif
     0x05, 0x01, // Usage Page (Generic Desktop)
     0x09, 0x06, // Usage (Keyboard)
     0xA1, 0x01, // Collection (Application)
-#ifdef KEYBOARD_SHARED_EP
+#    ifdef KEYBOARD_SHARED_EP
     0x85, REPORT_ID_KEYBOARD, // Report ID
-#endif
+#    endif
     // Modifiers (8 bits)
     0x05, 0x07, //   Usage Page (Keyboard/Keypad)
     0x19, 0xE0, //   Usage Minimum (Keyboard Left Control)
@@ -434,16 +488,16 @@ const PROGMEM uchar keyboard_hid_report[] = {
     0x75, 0x03, //   Report Size (3)
     0x91, 0x03, //   Output (Constant)
     0xC0,       // End Collection
-#ifndef KEYBOARD_SHARED_EP
+#    ifndef KEYBOARD_SHARED_EP
 };
-#endif
+#    endif
 
-#if defined(SHARED_EP_ENABLE) && !defined(SHARED_REPORT_STARTED)
+#    if defined(SHARED_EP_ENABLE) && !defined(SHARED_REPORT_STARTED)
 const PROGMEM uchar shared_hid_report[] = {
-#    define SHARED_REPORT_STARTED
-#endif
+#        define SHARED_REPORT_STARTED
+#    endif
 
-#ifdef NKRO_ENABLE
+#    ifdef NKRO_ENABLE
     // NKRO report descriptor
     0x05, 0x01,           // Usage Page (Generic Desktop)
     0x09, 0x06,           // Usage (Keyboard)
@@ -480,9 +534,9 @@ const PROGMEM uchar shared_hid_report[] = {
     0x75, 0x03, //   Report Size (3)
     0x91, 0x03, //   Output (Constant)
     0xC0,       // End Collection
-#endif
+#    endif
 
-#ifdef MOUSE_ENABLE
+#    ifdef MOUSE_ENABLE
     // Mouse report descriptor
     0x05, 0x01,            // Usage Page (Generic Desktop)
     0x09, 0x02,            // Usage (Mouse)
@@ -500,31 +554,31 @@ const PROGMEM uchar shared_hid_report[] = {
     0x75, 0x01, //     Report Size (1)
     0x81, 0x02, //     Input (Data, Variable, Absolute)
 
-#    ifdef MOUSE_EXTENDED_REPORT
+#        ifdef MOUSE_EXTENDED_REPORT
     // Boot protocol XY ignored in Report protocol
     0x95, 0x02, //     Report Count (2)
     0x75, 0x08, //     Report Size (8)
     0x81, 0x03, //     Input (Constant)
-#    endif
+#        endif
 
     // X/Y position (2 or 4 bytes)
     0x05, 0x01, //     Usage Page (Generic Desktop)
     0x09, 0x30, //     Usage (X)
     0x09, 0x31, //     Usage (Y)
-#    ifndef MOUSE_EXTENDED_REPORT
+#        ifndef MOUSE_EXTENDED_REPORT
     0x15, 0x81, //     Logical Minimum (-127)
     0x25, 0x7F, //     Logical Maximum (127)
     0x95, 0x02, //     Report Count (2)
     0x75, 0x08, //     Report Size (8)
-#    else
+#        else
     0x16, 0x01, 0x80, // Logical Minimum (-32767)
     0x26, 0xFF, 0x7F, // Logical Maximum (32767)
     0x95, 0x02,       // Report Count (2)
     0x75, 0x10,       // Report Size (16)
-#    endif
+#        endif
     0x81, 0x06, //     Input (Data, Variable, Relative)
 
-#    ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
+#        ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
     // Feature report and padding (1 byte)
     0xA1, 0x02,                                    //     Collection (Logical)
     0x09, 0x48,                                    //       Usage (Resolution Multiplier)
@@ -540,31 +594,46 @@ const PROGMEM uchar shared_hid_report[] = {
     0x45, 0x00,                                    //       Physical Maximum (0)
     0x75, 0x06,                                    //       Report Size (6)
     0xB1, 0x03,                                    //       Feature (Constant)
-#    endif
+#        endif
 
-    // Vertical wheel (1 byte)
+    // Vertical wheel (1 or 2 bytes)
     0x09, 0x38, //     Usage (Wheel)
+#        ifndef WHEEL_EXTENDED_REPORT
     0x15, 0x81, //     Logical Minimum (-127)
     0x25, 0x7F, //     Logical Maximum (127)
     0x95, 0x01, //     Report Count (1)
     0x75, 0x08, //     Report Size (8)
+#        else
+    0x16, 0x01, 0x80, //     Logical Minimum (-32767)
+    0x26, 0xFF, 0x7F, //     Logical Maximum (32767)
+    0x95, 0x01,       //     Report Count (1)
+    0x75, 0x10,       //     Report Size (16)
+#        endif
     0x81, 0x06, //     Input (Data, Variable, Relative)
-    // Horizontal wheel (1 byte)
+
+    // Horizontal wheel (1 or 2 bytes)
     0x05, 0x0C,       //     Usage Page (Consumer)
     0x0A, 0x38, 0x02, //     Usage (AC Pan)
-    0x15, 0x81,       //     Logical Minimum (-127)
-    0x25, 0x7F,       //     Logical Maximum (127)
+#        ifndef WHEEL_EXTENDED_REPORT
+    0x15, 0x81, //     Logical Minimum (-127)
+    0x25, 0x7F, //     Logical Maximum (127)
+    0x95, 0x01, //     Report Count (1)
+    0x75, 0x08, //     Report Size (8)
+#        else
+    0x16, 0x01, 0x80, //     Logical Minimum (-32767)
+    0x26, 0xFF, 0x7F, //     Logical Maximum (32767)
     0x95, 0x01,       //     Report Count (1)
-    0x75, 0x08,       //     Report Size (8)
-    0x81, 0x06,       //     Input (Data, Variable, Relative)
-#    ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
+    0x75, 0x10,       //     Report Size (16)
+#        endif
+    0x81, 0x06, //     Input (Data, Variable, Relative)
+#        ifdef POINTING_DEVICE_HIRES_SCROLL_ENABLE
     0xC0, //   End Collection
-#    endif
+#        endif
     0xC0, //   End Collection
     0xC0, // End Collection
-#endif
+#    endif
 
-#ifdef EXTRAKEY_ENABLE
+#    ifdef EXTRAKEY_ENABLE
     // Extrakeys report descriptor
     0x05, 0x01,             // Usage Page (Generic Desktop)
     0x09, 0x80,             // Usage (System Control)
@@ -591,48 +660,48 @@ const PROGMEM uchar shared_hid_report[] = {
     0x75, 0x10,               //   Report Size (16)
     0x81, 0x00,               //   Input (Data, Array, Absolute)
     0xC0,                     // End Collection
-#endif
+#    endif
 
-#ifdef JOYSTICK_ENABLE
+#    ifdef JOYSTICK_ENABLE
     // Joystick report descriptor
     0x05, 0x01,               // Usage Page (Generic Desktop)
     0x09, 0x04,               // Usage (Joystick)
     0xA1, 0x01,               // Collection (Application)
     0x85, REPORT_ID_JOYSTICK, //   Report ID
     0xA1, 0x00,               //   Collection (Physical)
-#    if JOYSTICK_AXIS_COUNT > 0
+#        if JOYSTICK_AXIS_COUNT > 0
     0x05, 0x01, //     Usage Page (Generic Desktop)
     0x09, 0x30, //     Usage (X)
-#        if JOYSTICK_AXIS_COUNT > 1
+#            if JOYSTICK_AXIS_COUNT > 1
     0x09, 0x31, //     Usage (Y)
-#        endif
-#        if JOYSTICK_AXIS_COUNT > 2
+#            endif
+#            if JOYSTICK_AXIS_COUNT > 2
     0x09, 0x32, //     Usage (Z)
-#        endif
-#        if JOYSTICK_AXIS_COUNT > 3
+#            endif
+#            if JOYSTICK_AXIS_COUNT > 3
     0x09, 0x33, //     Usage (Rx)
-#        endif
-#        if JOYSTICK_AXIS_COUNT > 4
+#            endif
+#            if JOYSTICK_AXIS_COUNT > 4
     0x09, 0x34, //     Usage (Ry)
-#        endif
-#        if JOYSTICK_AXIS_COUNT > 5
+#            endif
+#            if JOYSTICK_AXIS_COUNT > 5
     0x09, 0x35, //     Usage (Rz)
-#        endif
-#        if JOYSTICK_AXIS_RESOLUTION == 8
+#            endif
+#            if JOYSTICK_AXIS_RESOLUTION == 8
     0x15, -JOYSTICK_MAX_VALUE, //     Logical Minimum
     0x25, JOYSTICK_MAX_VALUE,  //     Logical Maximum
     0x95, JOYSTICK_AXIS_COUNT, //     Report Count
     0x75, 0x08,                //     Report Size (8)
-#        else
+#            else
     0x16, HID_VALUE_16(-JOYSTICK_MAX_VALUE), //     Logical Minimum
     0x26, HID_VALUE_16(JOYSTICK_MAX_VALUE),  //     Logical Maximum
     0x95, JOYSTICK_AXIS_COUNT,               //     Report Count
     0x75, 0x10,                              //     Report Size (16)
-#        endif
+#            endif
     0x81, 0x02, //     Input (Data, Variable, Absolute)
-#    endif
+#        endif
 
-#    if JOYSTICK_BUTTON_COUNT > 0
+#        if JOYSTICK_BUTTON_COUNT > 0
     0x05, 0x09,                  //     Usage Page (Button)
     0x19, 0x01,                  //     Usage Minimum (Button 1)
     0x29, JOYSTICK_BUTTON_COUNT, //     Usage Maximum
@@ -642,17 +711,17 @@ const PROGMEM uchar shared_hid_report[] = {
     0x75, 0x01,                  //     Report Size (1)
     0x81, 0x02,                  //     Input (Data, Variable, Absolute)
 
-#        if (JOYSTICK_BUTTON_COUNT % 8) != 0
+#            if (JOYSTICK_BUTTON_COUNT % 8) != 0
     0x95, 8 - (JOYSTICK_BUTTON_COUNT % 8), //     Report Count
     0x75, 0x01,                            //     Report Size (1)
     0x81, 0x03,                            //     Input (Constant)
+#            endif
 #        endif
-#    endif
     0xC0, //   End Collection
     0xC0, // End Collection
-#endif
+#    endif
 
-#ifdef DIGITIZER_ENABLE
+#    ifdef DIGITIZER_ENABLE
     // Digitizer report descriptor
     0x05, 0x0D,                // Usage Page (Digitizers)
     0x09, 0x01,                // Usage (Digitizer)
@@ -685,9 +754,9 @@ const PROGMEM uchar shared_hid_report[] = {
     0x81, 0x02,       //     Input (Data, Variable, Absolute)
     0xC0,             //   End Collection
     0xC0,             // End Collection
-#endif
+#    endif
 
-#ifdef PROGRAMMABLE_BUTTON_ENABLE
+#    ifdef PROGRAMMABLE_BUTTON_ENABLE
     // Programmable buttons report descriptor
     0x05, 0x0C,                          // Usage Page (Consumer)
     0x09, 0x01,                          // Usage (Consumer Control)
@@ -705,13 +774,13 @@ const PROGMEM uchar shared_hid_report[] = {
     0x81, 0x02,                          //     Input (Data, Variable, Absolute)
     0xC0,                                //   End Collection
     0xC0,                                // End Collection
-#endif
+#    endif
 
-#ifdef SHARED_EP_ENABLE
+#    ifdef SHARED_EP_ENABLE
 };
-#endif
+#    endif
 
-#ifdef RAW_ENABLE
+#    ifdef RAW_ENABLE
 const PROGMEM uchar raw_hid_report[] = {
     0x06, HID_VALUE_16(RAW_USAGE_PAGE), // Usage Page (Vendor Defined)
     0x09, RAW_USAGE_ID,                 // Usage (Vendor Defined)
@@ -732,9 +801,9 @@ const PROGMEM uchar raw_hid_report[] = {
     0x91, 0x02,            //   Output (Data, Variable, Absolute)
     0xC0                   // End Collection
 };
-#endif
+#    endif
 
-#if defined(CONSOLE_ENABLE)
+#    if defined(CONSOLE_ENABLE)
 const PROGMEM uchar console_hid_report[] = {
     0x06, 0x31, 0xFF, // Usage Page (Vendor Defined - PJRC Teensy compatible)
     0x09, 0x74,       // Usage (Vendor Defined - PJRC Teensy compatible)
@@ -748,15 +817,15 @@ const PROGMEM uchar console_hid_report[] = {
     0x81, 0x02,                //   Input (Data, Variable, Absolute)
     0xC0                       // End Collection
 };
-#endif
+#    endif
 
-#ifndef USB_MAX_POWER_CONSUMPTION
-#    define USB_MAX_POWER_CONSUMPTION 500
-#endif
+#    ifndef USB_MAX_POWER_CONSUMPTION
+#        define USB_MAX_POWER_CONSUMPTION 500
+#    endif
 
-#ifndef USB_POLLING_INTERVAL_MS
-#    define USB_POLLING_INTERVAL_MS 1
-#endif
+#    ifndef USB_POLLING_INTERVAL_MS
+#        define USB_POLLING_INTERVAL_MS 1
+#    endif
 
 // clang-format off
 const PROGMEM usbStringDescriptor_t usbStringDescriptorZero = {
@@ -1044,78 +1113,78 @@ USB_PUBLIC usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
                     usbMsgPtr = (usbMsgPtr_t)&usbStringDescriptorProduct;
                     len       = usbStringDescriptorProduct.header.bLength;
                     break;
-#if defined(SERIAL_NUMBER)
+#    if defined(SERIAL_NUMBER)
                 case 3: // iSerialNumber
                     usbMsgPtr = (usbMsgPtr_t)&usbStringDescriptorSerial;
                     len       = usbStringDescriptorSerial.header.bLength;
                     break;
-#endif
+#    endif
             }
-#ifdef OS_DETECTION_ENABLE
+#    ifdef OS_DETECTION_ENABLE
             process_wlength(rq->wLength.word);
-#endif
+#    endif
             break;
         case USBDESCR_HID:
             switch (rq->wIndex.word) {
-#ifndef KEYBOARD_SHARED_EP
+#    ifndef KEYBOARD_SHARED_EP
                 case KEYBOARD_INTERFACE:
                     usbMsgPtr = (usbMsgPtr_t)&usbConfigurationDescriptor.keyboardHID;
                     len       = sizeof(usbHIDDescriptor_t);
                     break;
-#endif
+#    endif
 
-#if defined(RAW_ENABLE)
+#    if defined(RAW_ENABLE)
                 case RAW_INTERFACE:
                     usbMsgPtr = (usbMsgPtr_t)&usbConfigurationDescriptor.rawHID;
                     len       = sizeof(usbHIDDescriptor_t);
                     break;
-#endif
+#    endif
 
-#ifdef SHARED_EP_ENABLE
+#    ifdef SHARED_EP_ENABLE
                 case SHARED_INTERFACE:
                     usbMsgPtr = (usbMsgPtr_t)&usbConfigurationDescriptor.sharedHID;
                     len       = sizeof(usbHIDDescriptor_t);
                     break;
-#endif
+#    endif
 
-#if defined(CONSOLE_ENABLE)
+#    if defined(CONSOLE_ENABLE)
                 case CONSOLE_INTERFACE:
                     usbMsgPtr = (usbMsgPtr_t)&usbConfigurationDescriptor.consoleHID;
                     len       = sizeof(usbHIDDescriptor_t);
                     break;
-#endif
+#    endif
             }
             break;
         case USBDESCR_HID_REPORT:
             /* interface index */
             switch (rq->wIndex.word) {
-#ifndef KEYBOARD_SHARED_EP
+#    ifndef KEYBOARD_SHARED_EP
                 case KEYBOARD_INTERFACE:
                     usbMsgPtr = (usbMsgPtr_t)keyboard_hid_report;
                     len       = sizeof(keyboard_hid_report);
                     break;
-#endif
+#    endif
 
-#if defined(RAW_ENABLE)
+#    if defined(RAW_ENABLE)
                 case RAW_INTERFACE:
                     usbMsgPtr = (usbMsgPtr_t)raw_hid_report;
                     len       = sizeof(raw_hid_report);
                     break;
-#endif
+#    endif
 
-#ifdef SHARED_EP_ENABLE
+#    ifdef SHARED_EP_ENABLE
                 case SHARED_INTERFACE:
                     usbMsgPtr = (usbMsgPtr_t)shared_hid_report;
                     len       = sizeof(shared_hid_report);
                     break;
-#endif
+#    endif
 
-#if defined(CONSOLE_ENABLE)
+#    if defined(CONSOLE_ENABLE)
                 case CONSOLE_INTERFACE:
                     usbMsgPtr = (usbMsgPtr_t)console_hid_report;
                     len       = sizeof(console_hid_report);
                     break;
-#endif
+#    endif
             }
             break;
     }
