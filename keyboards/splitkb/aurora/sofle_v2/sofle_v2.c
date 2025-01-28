@@ -35,8 +35,10 @@ enum layers {
 
 oled_rotation_t oled_init_kb(oled_rotation_t rotation) {
     if (!is_keyboard_master()) {
+        oled_set_brightness(OLED_BRIGHTNESS - 20);
         return OLED_ROTATION_180; // flips the display 180 degrees if offhand
     }
+    oled_set_brightness(OLED_BRIGHTNESS);
     return OLED_ROTATION_270;
 }
 

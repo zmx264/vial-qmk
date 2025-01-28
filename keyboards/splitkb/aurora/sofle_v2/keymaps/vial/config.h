@@ -14,5 +14,4 @@
 #define DYNAMIC_KEYMAP_LAYER_COUNT 8
 
 // zmx
-#define OLED_BRIGHTNESS 70
 #define RGB_MATRIX_DEFAULT_ON false

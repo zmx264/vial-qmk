@@ -112,7 +112,7 @@
         "encoder": {
             "right": {
                 "rotary": [
-                    {"pin_a": "B2", "pin_b": "B6"}
+                    {"pin_a": "B2", "pin_b": "B6", "resolution": 2}
                 ]
             }
         },
