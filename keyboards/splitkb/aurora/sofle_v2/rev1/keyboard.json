@@ -13,7 +13,7 @@
         "mousekey": true,
         "oled": true,
         "rgb_matrix": false,
-        "wpm": true
+        "wpm": false
     },
     "build": {
         "lto": true

@@ -17,7 +17,7 @@
 #include "quantum.h"
 
 // OLED animation
-#include "lib/bongocat.h"
+// #include "lib/bongocat.h"
 
 // The first four layers gets a name for readability, which is then used in the OLED below.
 // clang-format off
@@ -242,6 +242,14 @@ void render_layer_state(void) {
     }
 }
 
+static void render_zmx_logo(void) {
+    static const unsigned char PROGMEM raw_logo[] = {
+        0, 0, 0, 0, 0, 0, 0, 0,   32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 96, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   192, 56, 8, 8, 24, 48, 96, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 96, 48, 24, 28, 224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 16, 16, 32, 32, 32, 64,  64,  128, 128, 0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 64, 0,  0,   0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 128, 64, 96, 48, 24, 12, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 63, 0, 0, 0, 0, 0, 0, 3, 14, 56, 224, 0, 0, 192, 96, 48, 24, 6, 3, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 4, 4, 24, 160, 96, 96, 80, 140, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 224, 16, 8,  12, 6,  3,  1,  0,  0,  0,  0,  0,  0,  0,  0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0,   0,  0, 0, 0,  0,  0,  0,   0, 0, 0, 3, 3, 0, 0, 0, 0, 0, 0,   0,  0,  0,  0,  255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  128, 192, 96,  16,  24, 8, 12, 6, 3, 1, 0, 0, 0, 0, 0, 1, 1, 2,   6,   24, 48, 192, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1,   1,   1,  1,  3,  2,  2,  2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,   0,  0, 0, 0, 0, 0, 0, 0, 0,  0,  0,   0, 0, 0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,   0,  0,  0,  0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    };
+    oled_write_raw_P((const char *)raw_logo, sizeof(raw_logo));
+}
+
 bool oled_task_kb(void) {
     if (!oled_task_user()) {
         return false;
@@ -257,10 +265,10 @@ bool oled_task_kb(void) {
         render_mod_status_ctrl_shift(get_mods() | get_oneshot_mods());
         render_kb_LED_state();
     } else {
-        render_bongocat();
-        oled_set_cursor(14, 0); // sets cursor to (column, row) using charactar spacing (4 rows on 128x32 screen, anything more will overflow back to the top)
-        oled_write_P(PSTR("WPM:"), false);
-        oled_write(get_u8_str(get_current_wpm(), '0'), false); // writes wpm on top right corner of string
+        render_zmx_logo();
+        // oled_set_cursor(14, 0); // sets cursor to (column, row) using charactar spacing (4 rows on 128x32 screen, anything more will overflow back to the top)
+        // oled_write_P(PSTR("WPM:"), false);
+        // oled_write(get_u8_str(get_current_wpm(), '0'), false); // writes wpm on top right corner of string
     }
     return false;
 }

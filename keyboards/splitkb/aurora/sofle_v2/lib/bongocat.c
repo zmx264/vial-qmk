@@ -128,7 +128,7 @@ void render_bongocat(void) {
         bongo_sleep = timer_read32();
     } else {
         if (timer_elapsed32(bongo_sleep) > OLED_TIMEOUT) {
-            // oled_off();
+            oled_off();
         } else {
             if (timer_elapsed32(bongo_timer) > IDLE_FRAME_DURATION) {
                 bongo_timer = timer_read32();
