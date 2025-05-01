@@ -34,3 +34,10 @@
 // LEDs
 #define D5 12U
 #define B0 13U
+
+// Bottom row
+#define B7 12U
+// #define D5 13U
+#define C7 14U
+#define F1 15U
+#define F0 16U
