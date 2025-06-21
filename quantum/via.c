@@ -79,7 +79,6 @@ void via_qmk_rgblight_get_value(uint8_t *data);
 #if defined(VIA_QMK_RGB_MATRIX_ENABLE)
 void via_qmk_rgb_matrix_set_value(uint8_t *data);
 void via_qmk_rgb_matrix_get_value(uint8_t *data);
-void eeconfig_update_rgb_matrix(void);
 #endif
 
 // Can be called in an overriding via_init_kb() to test if keyboard level code usage of
@@ -363,7 +362,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             vialrgb_save(data, length);
 #endif
 #if defined(VIA_QMK_RGB_MATRIX_ENABLE)
-            eeconfig_update_rgb_matrix();
+            eeconfig_force_flush_rgb_matrix();
 #endif
 #if defined(VIA_CUSTOM_LIGHTING_ENABLE)
             raw_hid_receive_kb(data, length);
