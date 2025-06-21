@@ -144,7 +144,7 @@ static int magic_settings_set(const qmk_settings_proto_t *proto, const void *set
     keymap_config.nkro = !!(flags & (1 << 7));
     keymap_config.swap_lctl_lgui = !!(flags & (1 << 8));
     keymap_config.swap_rctl_rgui = !!(flags & (1 << 9));
-    eeconfig_update_keymap(keymap_config.raw);
+    eeconfig_update_keymap(&keymap_config);
 
     return 0;
 }
@@ -192,7 +192,7 @@ void qmk_settings_reset(void) {
     clear_keyboard();
     keymap_config.raw = 0;
     keymap_config.oneshot_enable = 1;
-    eeconfig_update_keymap(keymap_config.raw);
+    eeconfig_update_keymap(&keymap_config);
 
     /* to trigger all callbacks */
     qmk_settings_init();

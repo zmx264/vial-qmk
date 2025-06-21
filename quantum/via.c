@@ -54,6 +54,8 @@
 #include "dynamic_keymap.h"
 #include "eeprom.h"
 #include "version.h" // for QMK_BUILDDATE used in EEPROM magic
+#include "quantum/nvm/eeprom/nvm_eeprom_eeconfig_internal.h"
+#include "quantum/nvm/eeprom/nvm_eeprom_via_internal.h"
 
 #ifdef VIAL_ENABLE
 #include "vial.h"
