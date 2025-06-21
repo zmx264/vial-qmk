@@ -173,7 +173,7 @@ void nvm_dynamic_keymap_read_buffer(uint32_t offset, uint32_t size, uint8_t *dat
 
 void nvm_dynamic_keymap_update_buffer(uint32_t offset, uint32_t size, uint8_t *data) {
     uint16_t dynamic_keymap_eeprom_size = DYNAMIC_KEYMAP_LAYER_COUNT * MATRIX_ROWS * MATRIX_COLS * 2;
-    void *   target                     = (void *)(DYNAMIC_KEYMAP_EEPROM_ADDR + offset);
+    void *   target                     = (void *)((uintptr_t)(DYNAMIC_KEYMAP_EEPROM_ADDR + offset));
     uint8_t *source                     = data;
 
 #ifdef VIAL_ENABLE
