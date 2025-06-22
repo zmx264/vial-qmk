@@ -124,8 +124,9 @@ typedef struct {
     uint8_t tapping_toggle;
     uint8_t unused;
     uint16_t quick_tap_term;
+    uint16_t flow_tap_term;
 } qmk_settings_t;
-_Static_assert(sizeof(qmk_settings_t) == 38, "unexpected size of the qmk_settings_t structure");
+_Static_assert(sizeof(qmk_settings_t) == 40, "unexpected size of the qmk_settings_t structure");
 
 struct qmk_settings_proto_t;
 
