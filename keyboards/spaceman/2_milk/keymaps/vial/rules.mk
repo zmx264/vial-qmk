@@ -6,3 +6,6 @@ OLED_ENABLE         = no
 LTO_ENABLE          = yes
 QMK_SETTINGS        = no
 COMBO_ENABLE        = yes
+CAPS_WORD_ENABLE = no
+LAYER_LOCK_ENABLE = no
+REPEAT_KEY_ENABLE = no

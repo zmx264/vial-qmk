@@ -55,3 +55,7 @@ ifeq ($(KEYBOARD), keebio/nyquist/rev5)
     COMBO_ENABLE        = yes
     QMK_SETTINGS        = yes
 endif
+
+CAPS_WORD_ENABLE = no
+LAYER_LOCK_ENABLE = no
+REPEAT_KEY_ENABLE = no
