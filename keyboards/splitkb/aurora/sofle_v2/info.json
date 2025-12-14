@@ -11,6 +11,7 @@
     "url": "https://splitkb.com",
     "usb": {
         "device_version": "1.0.0",
-        "vid": "0x8D1D"
+        "vid": "0x05AC",
+        "pid": "0x0220"
     }
 }
