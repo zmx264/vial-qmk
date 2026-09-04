@@ -15,6 +15,10 @@
  */
 
 #include "quantum.h"
+#include "host.h"
+#if defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_KB)
+#    include "transactions.h"
+#endif
 
 // OLED animation
 // #include "lib/bongocat.h"
@@ -34,9 +38,9 @@ enum layers {
 // and has been copied directly from `crkbd/soundmonster/keymap.c`
 
 oled_rotation_t oled_init_kb(oled_rotation_t rotation) {
-    if (!is_keyboard_master()) {
+    if (!is_keyboard_left()) {
         oled_set_brightness(OLED_BRIGHTNESS - 20);
-        return OLED_ROTATION_180; // flips the display 180 degrees if offhand
+        return OLED_ROTATION_180; // flips the display 180 degrees for right side
     }
     oled_set_brightness(OLED_BRIGHTNESS);
     return OLED_ROTATION_270;
@@ -250,11 +254,118 @@ static void render_zmx_logo(void) {
     oled_write_raw_P((const char *)raw_logo, sizeof(raw_logo));
 }
 
+static bool mouse_jiggler_enabled = false;
+static uint32_t mouse_jiggler_timer = 0;
+static uint8_t mouse_jiggler_phase = 0;
+static uint32_t mouse_jiggler_step_timer = 0;
+static uint32_t mouse_jiggler_start_time = 0;
+static bool host_is_suspended = false;
+static uint8_t mouse_jiggler_axis = 0; // Alternates between 0 (X) and 1 (Y)
+static uint16_t mouse_jiggler_current_interval = 30000;
+
+#define MOUSE_JIGGLER_STEP_DELAY 20                             // 20 ms return pulse
+#define MOUSE_JIGGLER_AUTO_OFF_MS (8UL * 60UL * 60UL * 1000UL) // 8 hours auto-off safety timeout
+
+static uint16_t get_next_jiggle_interval(void) {
+    // Randomized interval between 25s and 35s to appear natural and evade detection
+    return 25000 + (timer_read() % 10000);
+}
+
+void mouse_jiggler_toggle(void) {
+    mouse_jiggler_enabled = !mouse_jiggler_enabled;
+    mouse_jiggler_phase = 0;
+    mouse_jiggler_timer = timer_read32();
+    mouse_jiggler_start_time = timer_read32();
+    mouse_jiggler_current_interval = get_next_jiggle_interval();
+}
+
+bool mouse_jiggler_is_enabled(void) {
+    return mouse_jiggler_enabled;
+}
+
+static void mouse_jiggler_task(void) {
+    if (!mouse_jiggler_enabled || !is_keyboard_master() || host_is_suspended) {
+        return;
+    }
+
+    // Auto-off safety timeout: auto disable after 8 hours of continuous operation
+    if (timer_elapsed32(mouse_jiggler_start_time) >= MOUSE_JIGGLER_AUTO_OFF_MS) {
+        mouse_jiggler_enabled = false;
+        mouse_jiggler_phase = 0;
+        return;
+    }
+
+    // Smart Inactivity Detection: do not jiggle while the user is actively typing or turning knobs
+    if (last_input_activity_elapsed() < mouse_jiggler_current_interval) {
+        mouse_jiggler_timer = timer_read32();
+        return;
+    }
+
+    if (mouse_jiggler_phase == 0) {
+        if (timer_elapsed32(mouse_jiggler_timer) >= mouse_jiggler_current_interval) {
+            report_mouse_t report = {0};
+            mouse_jiggler_axis = !mouse_jiggler_axis;
+            if (mouse_jiggler_axis) {
+                report.x = 1;
+            } else {
+                report.y = 1;
+            }
+            host_mouse_send(&report);
+            mouse_jiggler_phase = 1;
+            mouse_jiggler_step_timer = timer_read32();
+        }
+    } else if (mouse_jiggler_phase == 1) {
+        if (timer_elapsed32(mouse_jiggler_step_timer) >= MOUSE_JIGGLER_STEP_DELAY) {
+            report_mouse_t report = {0};
+            if (mouse_jiggler_axis) {
+                report.x = -1;
+            } else {
+                report.y = -1;
+            }
+            host_mouse_send(&report);
+            mouse_jiggler_phase = 0;
+            mouse_jiggler_timer = timer_read32();
+            mouse_jiggler_current_interval = get_next_jiggle_interval();
+        }
+    }
+}
+
+#if defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_KB)
+static void mouse_jiggler_rpc_slave_handler(uint8_t in_buflen, const void *in_data, uint8_t out_buflen, void *out_data) {
+    if (in_buflen >= sizeof(bool)) {
+        mouse_jiggler_enabled = *(const bool *)in_data;
+    }
+}
+#endif
+
+#ifdef OLED_ENABLE
+static void render_mouse_jiggler_status(void) {
+    if (oled_max_chars() > 5) {
+        // Horizontal / Landscape orientation (e.g. OLED_ROTATION_0 or OLED_ROTATION_180: 21 cols x 4 lines)
+        // Positioned as an inverted badge in the top-right corner
+        if (mouse_jiggler_enabled) {
+            uint8_t col = (oled_max_chars() >= 6) ? (oled_max_chars() - 6) : 0;
+            oled_set_cursor(col, 0);
+            oled_write_P(PSTR(" JGL "), true);
+        }
+    } else {
+        // Vertical / Portrait orientation (e.g. OLED_ROTATION_90 or OLED_ROTATION_270: 5 cols x 16 lines)
+        // Positioned on the bottom line of the 5-character wide display
+        oled_set_cursor(0, oled_max_lines() - 1);
+        if (mouse_jiggler_enabled) {
+            oled_write_P(PSTR(" JGL "), true);
+        } else {
+            oled_write_P(PSTR("     "), false);
+        }
+    }
+}
+#endif
+
 bool oled_task_kb(void) {
     if (!oled_task_user()) {
         return false;
     }
-    if (is_keyboard_master()) {
+    if (is_keyboard_left()) {
         // Renders the current keyboard state (layers and mods)
         render_logo();
         render_logo_text();
@@ -266,9 +377,7 @@ bool oled_task_kb(void) {
         render_kb_LED_state();
     } else {
         render_zmx_logo();
-        // oled_set_cursor(14, 0); // sets cursor to (column, row) using charactar spacing (4 rows on 128x32 screen, anything more will overflow back to the top)
-        // oled_write_P(PSTR("WPM:"), false);
-        // oled_write(get_u8_str(get_current_wpm(), '0'), false); // writes wpm on top right corner of string
+        render_mouse_jiggler_status();
     }
     return false;
 }
@@ -299,3 +408,53 @@ bool encoder_update_kb(uint8_t index, bool clockwise) {
     return true;
 }
 #endif
+
+void keyboard_post_init_kb(void) {
+#if defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_KB)
+    transaction_register_rpc(RPC_ID_MOUSE_JIGGLER, mouse_jiggler_rpc_slave_handler);
+#endif
+    keyboard_post_init_user();
+}
+
+void suspend_power_down_kb(void) {
+    host_is_suspended = true;
+    suspend_power_down_user();
+}
+
+void suspend_wakeup_init_kb(void) {
+    host_is_suspended = false;
+    mouse_jiggler_timer = timer_read32();
+    suspend_wakeup_init_user();
+}
+
+void housekeeping_task_kb(void) {
+    if (is_keyboard_master()) {
+#if defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_KB)
+        static bool last_synced_state = false;
+        static uint32_t last_sync_time = 0;
+        bool state_changed = (mouse_jiggler_enabled != last_synced_state);
+        if ((state_changed && timer_elapsed32(last_sync_time) > 50) || timer_elapsed32(last_sync_time) > 500) {
+            last_sync_time = timer_read32();
+            if (transaction_rpc_send(RPC_ID_MOUSE_JIGGLER, sizeof(mouse_jiggler_enabled), &mouse_jiggler_enabled)) {
+                last_synced_state = mouse_jiggler_enabled;
+            }
+        }
+#endif
+        mouse_jiggler_task();
+    }
+    housekeeping_task_user();
+}
+
+bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
+    if (!process_record_user(keycode, record)) {
+        return false;
+    }
+    switch (keycode) {
+        case QK_KB_0:
+            if (record->event.pressed) {
+                mouse_jiggler_toggle();
+            }
+            return false;
+    }
+    return true;
+}

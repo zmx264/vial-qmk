@@ -1,4 +1,11 @@
 {
+    "customKeycodes": [
+        {
+            "name": "Mouse Jiggler",
+            "title": "Toggle Mouse Jiggler",
+            "shortName": "JGL"
+        }
+    ],
     "matrix": {
         "rows": 10,
         "cols": 6

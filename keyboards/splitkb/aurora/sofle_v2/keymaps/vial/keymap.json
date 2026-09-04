@@ -28,7 +28,7 @@
         [
             "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   ,                             "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   ,
             "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   ,                             "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   ,
-            "XXXXXXX"   , "RGB_TOG"   , "RGB_HUI"   , "RGB_SAI"   , "RGB_VAI"   , "XXXXXXX"   ,                             "XXXXXXX"   , "KC_VOLD"   , "KC_MUTE"   , "KC_VOLU"   , "XXXXXXX"   , "XXXXXXX"   ,
+            "XXXXXXX"   , "RGB_TOG"   , "RGB_HUI"   , "RGB_SAI"   , "RGB_VAI"   , "XXXXXXX"   ,                             "QK_KB_0"   , "KC_VOLD"   , "KC_MUTE"   , "KC_VOLU"   , "XXXXXXX"   , "XXXXXXX"   ,
             "XXXXXXX"   , "RGB_MOD"   , "RGB_HUD"   , "RGB_SAD"   , "RGB_VAD"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "XXXXXXX"   , "KC_MPRV"   , "KC_MPLY"   , "KC_MNXT"   , "XXXXXXX"   , "XXXXXXX"   ,
                                         "_______"   , "_______"   , "_______"   , "_______"   , "_______"   , "_______"   , "_______"   , "_______"   , "_______"   , "_______"
         ]
